@@ -8,8 +8,20 @@ echo "============================================================"
 echo " Gmail Attachment Manager - Proxmox LXC Installer"
 echo "============================================================"
 echo
+# Recover cleanly if a previous Proxmox/Debian package operation was interrupted.
+if ! dpkg --audit >/dev/null 2>&1 || [[ -f /var/lib/dpkg/updates/0000 ]]; then
+  echo "Repairing interrupted package configuration..."
+  dpkg --configure -a
+fi
+# dpkg --audit can be empty even when apt still needs dependency repair.
+if ! apt-get check >/dev/null 2>&1; then
+  echo "Repairing package dependencies..."
+  DEBIAN_FRONTEND=noninteractive apt-get -f install -y
+  dpkg --configure -a
+fi
+echo "Installing installer prerequisites..."
 apt-get update -qq
-apt-get install -y -qq curl jq ca-certificates >/dev/null
+DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl jq ca-certificates >/dev/null
 read -rsp "GitHub fine-grained read token for $APP_REPO: " GITHUB_TOKEN; echo
 [[ -n "$GITHUB_TOKEN" ]] || { echo "ERROR: token is required while the application repository is private."; exit 1; }
 if ! curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" "https://api.github.com/repos/$APP_REPO" >/dev/null; then echo "ERROR: token cannot read $APP_REPO."; exit 1; fi
